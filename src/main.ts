@@ -2,17 +2,16 @@
 import leaflet from "leaflet";
 
 // Style sheets
-import "leaflet/dist/leaflet.css"; // supporting style for Leaflet
-import "./style.css"; // student-controlled page style
+import "leaflet/dist/leaflet.css";
+import "./style.css";
 
 // Fix missing marker images
-import "./_leafletWorkaround.ts"; // fixes for missing Leaflet images
+import "./_leafletWorkaround.ts";
 
 // Import our luck function
 import luck from "./_luck.ts";
 
 // Create basic UI elements
-
 const controlPanelDiv = document.createElement("div");
 controlPanelDiv.id = "controlPanel";
 controlPanelDiv.innerHTML = `<h1>D3: Slug Stack!</h1>`;
@@ -81,6 +80,7 @@ function spawnCache(i: number, j: number) {
     2,
     Math.floor(luck([i, j, "initialValue"].toString()) * 4),
   );
+
   // Add a rectangle to the map to represent the cache
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
@@ -110,7 +110,6 @@ function spawnCache(i: number, j: number) {
 // Look around the player's neighborhood for caches to spawn
 for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
   for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-    // If location i,j is lucky enough, spawn a cache!
     if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
       spawnCache(i, j);
     }
