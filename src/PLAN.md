@@ -1,4 +1,4 @@
-# D3
+# D3 Slug Stack 'em Up
 
 ## Game Design Vision
 
