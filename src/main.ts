@@ -66,8 +66,13 @@ playerMarker.addTo(map);
 let playerPoints = 0;
 statusPanelDiv.innerHTML = "No points yet...";
 
-//used to display the number in the cell
-let rectVal: number | null;
+//create a cell map to easily access and alter data in the cubes
+//apparently the best way to do this
+type cubeKey = string;
+type cubeVal = number | null;
+
+//create the map
+//const cellMap = new Map<cubeKey, cubeVal>();
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
@@ -78,20 +83,25 @@ function spawnCache(i: number, j: number) {
     [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
   ]);
 
+  //used to display the number in the cell
+  //const rectVal: number | null;
+
+  const rectVal = Math.pow(
+    2,
+    Math.floor(luck([i, j, "initialValue"].toString()) * 4),
+  );
+  console.log(rectVal);
   // Add a rectangle to the map to represent the cache
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
-
   // Each cache has a random point value, mutable by the player
-  rectVal = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
 
   addVal(rect, rectVal);
-  console.log("points b4 click", playerPoints);
   rect.on("click", () => {
-    if (rectVal!) {
+    if (rectVal) {
       playerPoints += rectVal;
-      console.log("points after click", playerPoints, "rectval: ", rectVal);
-      statusPanelDiv.innerHTML = `${playerPoints}`;
+      console.log(rectVal);
+      statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
     }
   });
 }
@@ -108,12 +118,8 @@ for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
 
 function addVal(rect: leaflet.Rectangle, rectVal: number | null) {
   if (rectVal != null) {
-    const tooltip = leaflet.tooltip({
-      permanent: true,
-      direction: "center",
-    }).setContent(rectVal!.toString());
+    const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
+      .setContent(rectVal.toString());
     rect.bindTooltip(tooltip);
-  } else {
-    rect.unbindTooltip();
   }
 }
