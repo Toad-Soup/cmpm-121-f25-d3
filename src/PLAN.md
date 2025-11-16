@@ -20,11 +20,13 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 ### Steps
 
 - [x] Understand the requirements for the assignment
-- [ ] Put a basic leaflet map on the screen
-- [ ] draw the player's location on the map
-- [ ] draw a rectangle representing one cell on the map
-- [ ] use loops to draw a whole grid of cells on the map
-- [ ] edit edit tokens to all have values
-- [ ] inventory mechanic
-- [ ] pick up token mechanic
-- [ ] merge token mechanic
+- [x] Put a basic leaflet map on the screen
+- [x] draw the player's location on the map
+- [x] draw a rectangle representing one cell on the map
+- [x] use loops to draw a whole grid of cells on the map
+- [x] edit edit tokens to all have values
+- [x] inventory mechanic
+- [x] pick up token mechanic
+- [x] merge token mechanic
+- [ ] create a distance mechanic
+- [ ] fix issue with not hvaing a matching tile
