@@ -15,6 +15,7 @@ import luck from "./_luck.ts";
 
 const controlPanelDiv = document.createElement("div");
 controlPanelDiv.id = "controlPanel";
+controlPanelDiv.innerHTML = `<h1>D3: Slug Stack!</h1>`;
 document.body.append(controlPanelDiv);
 
 const mapDiv = document.createElement("div");
@@ -58,12 +59,15 @@ leaflet
 
 // Add a marker to represent the player
 const playerMarker = leaflet.marker(CLASSROOM_LATLNG);
-playerMarker.bindTooltip("That's you!");
+playerMarker.bindTooltip("Player Location");
 playerMarker.addTo(map);
 
 // Display the player's points
 let playerPoints = 0;
 statusPanelDiv.innerHTML = "No points yet...";
+
+//used to display the number in the cell
+let rectVal: number | null;
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
@@ -78,29 +82,17 @@ function spawnCache(i: number, j: number) {
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
 
-  // Handle interactions with the cache
-  rect.bindPopup(() => {
-    // Each cache has a random point value, mutable by the player
-    let pointValue = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+  // Each cache has a random point value, mutable by the player
+  rectVal = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
 
-    // The popup offers a description and button
-    const popupDiv = document.createElement("div");
-    popupDiv.innerHTML = `
-                <div>There is a cache here at "${i},${j}". It has value <span id="value">${pointValue}</span>.</div>
-                <button id="poke">poke</button>`;
-
-    // Clicking the button decrements the cache's value and increments the player's points
-    popupDiv
-      .querySelector<HTMLButtonElement>("#poke")!
-      .addEventListener("click", () => {
-        pointValue--;
-        popupDiv.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-          pointValue.toString();
-        playerPoints++;
-        statusPanelDiv.innerHTML = `${playerPoints} points accumulated`;
-      });
-
-    return popupDiv;
+  addVal(rect, rectVal);
+  console.log("points b4 click", playerPoints);
+  rect.on("click", () => {
+    if (rectVal!) {
+      playerPoints += rectVal;
+      console.log("points after click", playerPoints, "rectval: ", rectVal);
+      statusPanelDiv.innerHTML = `${playerPoints}`;
+    }
   });
 }
 
@@ -111,5 +103,17 @@ for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
       spawnCache(i, j);
     }
+  }
+}
+
+function addVal(rect: leaflet.Rectangle, rectVal: number | null) {
+  if (rectVal != null) {
+    const tooltip = leaflet.tooltip({
+      permanent: true,
+      direction: "center",
+    }).setContent(rectVal!.toString());
+    rect.bindTooltip(tooltip);
+  } else {
+    rect.unbindTooltip();
   }
 }
