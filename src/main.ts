@@ -66,14 +66,6 @@ playerMarker.addTo(map);
 let playerPoints = 0;
 statusPanelDiv.innerHTML = "No points yet...";
 
-//create a cell map to easily access and alter data in the cubes
-//apparently the best way to do this
-type cubeKey = string;
-type cubeVal = number | null;
-
-//create the map
-//const cellMap = new Map<cubeKey, cubeVal>();
-
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
   // Convert cell numbers into lat/lng bounds
@@ -83,26 +75,31 @@ function spawnCache(i: number, j: number) {
     [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
   ]);
 
-  //used to display the number in the cell
-  //const rectVal: number | null;
-
-  const rectVal = Math.pow(
+  // Each cache has a random point value, mutable by the player
+  let rectVal = Math.pow(
     2,
     Math.floor(luck([i, j, "initialValue"].toString()) * 4),
   );
-  console.log(rectVal);
   // Add a rectangle to the map to represent the cache
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
-  // Each cache has a random point value, mutable by the player
 
-  addVal(rect, rectVal);
+  const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
+    .setContent(rectVal.toString());
+  rect.bindTooltip(tooltip);
+
   rect.on("click", () => {
-    if (rectVal) {
+    console.log("clicked");
+    if (playerPoints == 0) {
       playerPoints += rectVal;
-      console.log(rectVal);
       statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
+      rect.remove();
+    } else if (playerPoints == rectVal) {
+      rectVal *= 2;
+      playerPoints = 0;
+      statusPanelDiv.innerHTML = "Slug Successfully Stacked";
     }
+    tooltip.setContent(rectVal.toString());
   });
 }
 
@@ -113,13 +110,5 @@ for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
       spawnCache(i, j);
     }
-  }
-}
-
-function addVal(rect: leaflet.Rectangle, rectVal: number | null) {
-  if (rectVal != null) {
-    const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
-      .setContent(rectVal.toString());
-    rect.bindTooltip(tooltip);
   }
 }
