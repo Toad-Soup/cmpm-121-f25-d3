@@ -35,8 +35,9 @@ const CLASSROOM_LATLNG = leaflet.latLng(
 // Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
-const NEIGHBORHOOD_SIZE = 8;
+const NEIGHBORHOOD_SIZE = 30;
 const CACHE_SPAWN_PROBABILITY = 0.1;
+const RANGE = 5;
 
 // Create the map (element with id "map" is defined in index.html)
 const map = leaflet.map(mapDiv, {
@@ -89,17 +90,20 @@ function spawnCache(i: number, j: number) {
   rect.bindTooltip(tooltip);
 
   rect.on("click", () => {
-    console.log("clicked");
-    if (playerPoints == 0) {
-      playerPoints += rectVal;
-      statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
-      rect.remove();
-    } else if (playerPoints == rectVal) {
-      rectVal *= 2;
-      playerPoints = 0;
-      statusPanelDiv.innerHTML = "Slug Successfully Stacked";
+    if (distance_to(i, j) <= RANGE) {
+      if (playerPoints == 0) {
+        playerPoints += rectVal;
+        statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
+        rect.remove();
+      } else if (playerPoints == rectVal) {
+        rectVal *= 2;
+        playerPoints = 0;
+        statusPanelDiv.innerHTML = "Slug Successfully Stacked";
+      }
+      tooltip.setContent(rectVal.toString());
+    } else {
+      statusPanelDiv.innerHTML = "Slug out of reach :(";
     }
-    tooltip.setContent(rectVal.toString());
   });
 }
 
@@ -111,4 +115,8 @@ for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
       spawnCache(i, j);
     }
   }
+}
+
+function distance_to(i: number, j: number) {
+  return Math.sqrt((i ** 2) + (j ** 2));
 }

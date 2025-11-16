@@ -28,5 +28,5 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 - [x] inventory mechanic
 - [x] pick up token mechanic
 - [x] merge token mechanic
-- [ ] create a distance mechanic
+- [x] create a distance mechanic
 - [ ] fix issue with not hvaing a matching tile
