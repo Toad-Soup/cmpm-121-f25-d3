@@ -34,7 +34,7 @@ const CLASSROOM_LATLNG = leaflet.latLng(
 // Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
-const NEIGHBORHOOD_SIZE = 30;
+const NEIGHBORHOOD_SIZE = 25;
 const CACHE_SPAWN_PROBABILITY = 0.1;
 const RANGE = 5;
 
@@ -66,16 +66,26 @@ playerMarker.addTo(map);
 let playerPoints = 0;
 statusPanelDiv.innerHTML = "No points yet...";
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+type key = number;
+type contents = number | null;
+
+const playerPosition = CLASSROOM_LATLNG;
+
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
   // Convert cell numbers into lat/lng bounds
-  const origin = CLASSROOM_LATLNG;
   const bounds = leaflet.latLngBounds([
-    [origin.lat + i * TILE_DEGREES, origin.lng + j * TILE_DEGREES],
-    [origin.lat + (i + 1) * TILE_DEGREES, origin.lng + (j + 1) * TILE_DEGREES],
+    [i * TILE_DEGREES, j * TILE_DEGREES],
+    [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
   ]);
 
-  // Each cache has a random point value, mutable by the player
+  console.log(i, j);
+
   let rectVal = Math.pow(
     2,
     Math.floor(luck([i, j, "initialValue"].toString()) * 4),
@@ -85,12 +95,13 @@ function spawnCache(i: number, j: number) {
   const rect = leaflet.rectangle(bounds);
   rect.addTo(map);
 
+  // Display text on the cache
   const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
     .setContent(rectVal.toString());
   rect.bindTooltip(tooltip);
 
   rect.on("click", () => {
-    if (distance_to(i, j) <= RANGE) {
+    if (distance_to_player(i, j) <= RANGE) {
       if (playerPoints == 0) {
         playerPoints += rectVal;
         statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
@@ -107,15 +118,34 @@ function spawnCache(i: number, j: number) {
   });
 }
 
-// Look around the player's neighborhood for caches to spawn
-for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-  for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-    if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
-      spawnCache(i, j);
+generateCells({
+  x: coordToIndex(playerPosition.lat),
+  y: coordToIndex(playerPosition.lng),
+});
+
+function generateCells(origin: Point) {
+  console.log(origin);
+  for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
+    for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
+      const x = origin.x + i;
+      const y = origin.y + j;
+      if (luck([x, y].toString()) < CACHE_SPAWN_PROBABILITY) {
+        spawnCache(x, y);
+      }
     }
   }
 }
 
-function distance_to(i: number, j: number) {
-  return Math.sqrt((i ** 2) + (j ** 2));
+function distance_to_player(i: number, j: number) {
+  const playerPoint = {
+    x: coordToIndex(playerPosition.lat),
+    y: coordToIndex(playerPosition.lng),
+  };
+  const dx = i - playerPoint.x;
+  const dy = j - playerPoint.y;
+  return Math.sqrt((dx ** 2) + (dy ** 2));
+}
+
+function coordToIndex(c: number) {
+  return Math.floor(c / TILE_DEGREES);
 }
