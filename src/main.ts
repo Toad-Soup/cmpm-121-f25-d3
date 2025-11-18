@@ -48,6 +48,8 @@ const map = leaflet.map(mapDiv, {
   scrollWheelZoom: false,
 });
 
+const cellGroup = leaflet.featureGroup().addTo(map);
+
 // Populate the map with a background tile layer
 leaflet
   .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -58,7 +60,7 @@ leaflet
   .addTo(map);
 
 // Add a marker to represent the player
-const playerMarker = leaflet.marker(CLASSROOM_LATLNG);
+let playerMarker = leaflet.marker(CLASSROOM_LATLNG);
 playerMarker.bindTooltip("Player Location");
 playerMarker.addTo(map);
 
@@ -107,9 +109,10 @@ function spawnCache(i: number, j: number) {
         statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
         rect.remove();
       } else if (playerPoints == rectVal) {
-        rectVal *= 2;
-        playerPoints = 0;
         statusPanelDiv.innerHTML = "Slug Successfully Stacked";
+        rectVal *= 2;
+        check_game_won(rectVal);
+        playerPoints = 0;
       }
       tooltip.setContent(rectVal.toString());
     } else {
@@ -118,17 +121,15 @@ function spawnCache(i: number, j: number) {
   });
 }
 
-generateCells({
-  x: coordToIndex(playerPosition.lat),
-  y: coordToIndex(playerPosition.lng),
-});
+generateCells();
 
-function generateCells(origin: Point) {
-  console.log(origin);
+function generateCells() {
+  cellGroup.clearLayers();
+  const mapCenter = pointCoordToIndex(map.getCenter());
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-      const x = origin.x + i;
-      const y = origin.y + j;
+      const x = mapCenter.x + i;
+      const y = mapCenter.y + j;
       if (luck([x, y].toString()) < CACHE_SPAWN_PROBABILITY) {
         spawnCache(x, y);
       }
@@ -149,3 +150,80 @@ function distance_to_player(i: number, j: number) {
 function coordToIndex(c: number) {
   return Math.floor(c / TILE_DEGREES);
 }
+
+function check_game_won(just_made: number) {
+  if (just_made >= 256) {
+    console.log("you won");
+    statusPanelDiv.innerHTML = "you did it!!";
+  }
+}
+
+//function pointIndexToCoord(p: Point): leaflet.LatLng {
+//  return leaflet.latLng(indexToCoord(p.x), indexToCoord(p.y));
+//}
+
+function pointCoordToIndex(ll: leaflet.LatLng): Point {
+  return { x: coordToIndex(ll.lat), y: coordToIndex(ll.lng) };
+}
+
+function move_player(dir: Point) {
+  playerPosition.lat += indexToCoord(dir.y);
+  playerPosition.lng += indexToCoord(dir.x);
+  playerMarker.remove();
+  playerMarker = leaflet.marker(playerPosition);
+  playerMarker.bindTooltip("That's you!");
+  playerMarker.addTo(map);
+}
+
+function indexToCoord(i: number) {
+  return i * TILE_DEGREES;
+}
+
+const DIRECTION_RIGHT: Point = {
+  x: 1,
+  y: 0,
+};
+const DIRECTION_LEFT: Point = {
+  x: -1,
+  y: 0,
+};
+const DIRECTION_UP: Point = {
+  x: 0,
+  y: 1,
+};
+const DIRECTION_DOWN: Point = {
+  x: 0,
+  y: -1,
+};
+
+const LEFT = document.createElement("button");
+LEFT.innerHTML = "MOVE: Left";
+LEFT.addEventListener("click", () => {
+  move_player(DIRECTION_LEFT);
+});
+
+const RIGHT = document.createElement("button");
+RIGHT.innerHTML = "MOVE: Right";
+RIGHT.addEventListener("click", () => {
+  move_player(DIRECTION_RIGHT);
+});
+
+const UP = document.createElement("button");
+UP.innerHTML = "MOVE: Up";
+UP.addEventListener("click", () => {
+  move_player(DIRECTION_UP);
+});
+
+const DOWN = document.createElement("button");
+DOWN.innerHTML = "MOVE: Down";
+DOWN.addEventListener("click", () => {
+  move_player(DIRECTION_DOWN);
+});
+const inputPanelDiv = document.createElement("div");
+inputPanelDiv.id = "inputPanel";
+document.body.append(inputPanelDiv);
+
+inputPanelDiv.appendChild(LEFT);
+inputPanelDiv.appendChild(RIGHT);
+inputPanelDiv.appendChild(UP);
+inputPanelDiv.appendChild(DOWN);
