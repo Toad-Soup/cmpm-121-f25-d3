@@ -86,8 +86,6 @@ function spawnCache(i: number, j: number) {
     [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
   ]);
 
-  console.log(i, j);
-
   let rectVal = Math.pow(
     2,
     Math.floor(luck([i, j, "initialValue"].toString()) * 4),
@@ -157,10 +155,6 @@ function check_game_won(just_made: number) {
     statusPanelDiv.innerHTML = "you did it!!";
   }
 }
-
-//function pointIndexToCoord(p: Point): leaflet.LatLng {
-//  return leaflet.latLng(indexToCoord(p.x), indexToCoord(p.y));
-//}
 
 function pointCoordToIndex(ll: leaflet.LatLng): Point {
   return { x: coordToIndex(ll.lat), y: coordToIndex(ll.lng) };
