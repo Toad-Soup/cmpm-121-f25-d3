@@ -73,8 +73,7 @@ interface Point {
   y: number;
 }
 
-//we need to create a map for memento
-//needs to also hold null to show that the node is empty?
+//map for memento
 const cellMap = new Map<string, number | null>();
 
 type contents = number | null;
@@ -83,7 +82,6 @@ const playerPosition = CLASSROOM_LATLNG;
 
 // Add caches to the map by cell numbers
 function spawnCache(i: number, j: number) {
-  // Convert cell numbers into lat/lng bounds
   const bounds = leaflet.latLngBounds([
     [i * TILE_DEGREES, j * TILE_DEGREES],
     [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
@@ -101,11 +99,9 @@ function spawnCache(i: number, j: number) {
     );
   }
 
-  // Add a rectangle to the map to represent the cache
   const rect = leaflet.rectangle(bounds);
   rect.addTo(cellGroup);
 
-  // Display text on the cache
   const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
     .setContent(rectVal.toString());
   rect.bindTooltip(tooltip);
@@ -151,10 +147,8 @@ function generateCells() {
       if (cellMap.has(key)) {
         const saved = cellMap.get(key);
         if (saved === null) {
-          //remember the cell was deleted
           continue;
         } else {
-          //remember the cells updated value and spawn it back
           spawnCache(x, y);
         }
       } else {
