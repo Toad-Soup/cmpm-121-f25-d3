@@ -48,7 +48,7 @@ const map = leaflet.map(mapDiv, {
   scrollWheelZoom: false,
 });
 
-const cellGroup = leaflet.featureGroup().addTo(map);
+const cellGroup = leaflet.layerGroup().addTo(map);
 
 // Populate the map with a background tile layer
 leaflet
@@ -73,7 +73,10 @@ interface Point {
   y: number;
 }
 
-type key = number;
+//we need to create a map for memento
+//needs to also hold null to show that the node is empty?
+const cellMap = new Map<string, number | null>();
+
 type contents = number | null;
 
 const playerPosition = CLASSROOM_LATLNG;
@@ -86,14 +89,21 @@ function spawnCache(i: number, j: number) {
     [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
   ]);
 
-  let rectVal = Math.pow(
-    2,
-    Math.floor(luck([i, j, "initialValue"].toString()) * 4),
-  );
+  const key = keyFrom(i, j);
+
+  let rectVal: number | null;
+  if (cellMap.has(key)) {
+    rectVal = cellMap.get(key)!;
+  } else {
+    rectVal = Math.pow(
+      2,
+      Math.floor(luck([i, j, "initialValue"].toString()) * 4),
+    );
+  }
 
   // Add a rectangle to the map to represent the cache
   const rect = leaflet.rectangle(bounds);
-  rect.addTo(map);
+  rect.addTo(cellGroup);
 
   // Display text on the cache
   const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
@@ -102,17 +112,23 @@ function spawnCache(i: number, j: number) {
 
   rect.on("click", () => {
     if (distance_to_player(i, j) <= RANGE) {
-      if (playerPoints == 0) {
-        playerPoints += rectVal;
-        statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
-        rect.remove();
-      } else if (playerPoints == rectVal) {
-        statusPanelDiv.innerHTML = "Slug Successfully Stacked";
-        rectVal *= 2;
-        check_game_won(rectVal);
-        playerPoints = 0;
+      if (rectVal !== null) {
+        if (playerPoints == 0) {
+          playerPoints += rectVal;
+          statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
+          cellMap.set(key, null);
+          tooltip.setContent("empty");
+          rect.remove();
+          return;
+        } else if (playerPoints == rectVal) {
+          statusPanelDiv.innerHTML = "Slug Successfully Stacked";
+          rectVal *= 2;
+          check_game_won(rectVal);
+          playerPoints = 0;
+        }
+        cellMap.set(key, rectVal);
+        tooltip.setContent(rectVal.toString());
       }
-      tooltip.setContent(rectVal.toString());
     } else {
       statusPanelDiv.innerHTML = "Slug out of reach :(";
     }
@@ -123,13 +139,28 @@ generateCells();
 
 function generateCells() {
   cellGroup.clearLayers();
+
   const mapCenter = pointCoordToIndex(map.getCenter());
+
   for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
     for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
       const x = mapCenter.x + i;
       const y = mapCenter.y + j;
-      if (luck([x, y].toString()) < CACHE_SPAWN_PROBABILITY) {
-        spawnCache(x, y);
+
+      const key = keyFrom(x, y);
+      if (cellMap.has(key)) {
+        const saved = cellMap.get(key);
+        if (saved === null) {
+          //remember the cell was deleted
+          continue;
+        } else {
+          //remember the cells updated value and spawn it back
+          spawnCache(x, y);
+        }
+      } else {
+        if (luck([x, y].toString()) < CACHE_SPAWN_PROBABILITY) {
+          spawnCache(x, y);
+        }
       }
     }
   }
@@ -164,13 +195,21 @@ function move_player(dir: Point) {
   playerPosition.lat += indexToCoord(dir.y);
   playerPosition.lng += indexToCoord(dir.x);
   playerMarker.remove();
+
   playerMarker = leaflet.marker(playerPosition);
   playerMarker.bindTooltip("That's you!");
   playerMarker.addTo(map);
+
+  generateCells(); // REFRESH MAP EVERY MOVE
 }
 
 function indexToCoord(i: number) {
   return i * TILE_DEGREES;
+}
+
+//gets the key for the map
+function keyFrom(i: number, j: number): string {
+  return `${i},${j}`;
 }
 
 const DIRECTION_RIGHT: Point = {
