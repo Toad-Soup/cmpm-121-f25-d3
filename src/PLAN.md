@@ -30,5 +30,8 @@ Key gameplay challenge: Can players collect and craft tokens from nearby locatio
 - [x] merge token mechanic
 - [x] create a distance mechanic
 - [ ] fix issue with not having a matching tile
-- [ ] make is so tiles are only visible in a certain location
-- [ ] allow for player movement
+- [x] make is so tiles are only visible in a certain location
+- [x] allow for player movement
+- [ ] make the camera follow the player
+- [x] make the tiles disapear once the player moves far away
+- [x] respawn edited tiles
