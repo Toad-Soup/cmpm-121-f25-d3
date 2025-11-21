@@ -194,7 +194,7 @@ function move_player(dir: Point) {
   playerMarker.bindTooltip("That's you!");
   playerMarker.addTo(map);
 
-  generateCells(); // REFRESH MAP EVERY MOVE
+  generateCells();
 }
 
 function indexToCoord(i: number) {
