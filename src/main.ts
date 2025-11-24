@@ -8,10 +8,10 @@ import "./style.css";
 // Fix missing marker images
 import "./_leafletWorkaround.ts";
 
-// Import our luck function
+// Import luck
 import luck from "./_luck.ts";
 
-// Create basic UI elements
+// UI elements
 const controlPanelDiv = document.createElement("div");
 controlPanelDiv.id = "controlPanel";
 controlPanelDiv.innerHTML = `<h1>D3: Slug Stack!</h1>`;
@@ -25,22 +25,14 @@ const statusPanelDiv = document.createElement("div");
 statusPanelDiv.id = "statusPanel";
 document.body.append(statusPanelDiv);
 
-// Our classroom location
-const CLASSROOM_LATLNG = leaflet.latLng(
-  36.997936938057016,
-  -122.05703507501151,
-);
-
-// Tunable gameplay parameters
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const TILE_DEGREES = 1e-4;
 const NEIGHBORHOOD_SIZE = 25;
 const CACHE_SPAWN_PROBABILITY = 0.1;
 const RANGE = 5;
 
-// Create the map (element with id "map" is defined in index.html)
 const map = leaflet.map(mapDiv, {
-  center: CLASSROOM_LATLNG,
+  center: [0, 0], // temporary, will be updated by GPS
   zoom: GAMEPLAY_ZOOM_LEVEL,
   minZoom: GAMEPLAY_ZOOM_LEVEL,
   maxZoom: GAMEPLAY_ZOOM_LEVEL,
@@ -50,21 +42,16 @@ const map = leaflet.map(mapDiv, {
 
 const cellGroup = leaflet.layerGroup().addTo(map);
 
-// Populate the map with a background tile layer
-leaflet
-  .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  })
+leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution:
+    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
+
+const playerPosition = leaflet.latLng(0, 0);
+let playerMarker = leaflet.marker(playerPosition).bindTooltip("Player Location")
   .addTo(map);
 
-// Add a marker to represent the player
-let playerMarker = leaflet.marker(CLASSROOM_LATLNG);
-playerMarker.bindTooltip("Player Location");
-playerMarker.addTo(map);
-
-// Display the player's points
 let playerPoints = 0;
 statusPanelDiv.innerHTML = "No points yet...";
 
@@ -73,138 +60,195 @@ interface Point {
   y: number;
 }
 
-//map for memento
 const cellMap = new Map<string, number | null>();
 
-type contents = number | null;
-
-const playerPosition = CLASSROOM_LATLNG;
-
-// Add caches to the map by cell numbers
-function spawnCache(i: number, j: number) {
-  const bounds = leaflet.latLngBounds([
-    [i * TILE_DEGREES, j * TILE_DEGREES],
-    [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
-  ]);
-
-  const key = keyFrom(i, j);
-
-  let rectVal: number | null;
-  if (cellMap.has(key)) {
-    rectVal = cellMap.get(key)!;
-  } else {
-    rectVal = Math.pow(
-      2,
-      Math.floor(luck([i, j, "initialValue"].toString()) * 4),
-    );
-  }
-
-  const rect = leaflet.rectangle(bounds);
-  rect.addTo(cellGroup);
-
-  const tooltip = leaflet.tooltip({ permanent: true, direction: "center" })
-    .setContent(rectVal.toString());
-  rect.bindTooltip(tooltip);
-
-  rect.on("click", () => {
-    if (distance_to_player(i, j) <= RANGE) {
-      if (rectVal !== null) {
-        if (playerPoints == 0) {
-          playerPoints += rectVal;
-          statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
-          cellMap.set(key, null);
-          tooltip.setContent("empty");
-          rect.remove();
-          return;
-        } else if (playerPoints == rectVal) {
-          statusPanelDiv.innerHTML = "Slug Successfully Stacked";
-          rectVal *= 2;
-          check_game_won(rectVal);
-          playerPoints = 0;
-        }
-        cellMap.set(key, rectVal);
-        tooltip.setContent(rectVal.toString());
-      }
-    } else {
-      statusPanelDiv.innerHTML = "Slug out of reach :(";
-    }
-  });
+//save game functionality
+function saveGameState() {
+  localStorage.setItem("playerLat", String(playerPosition.lat));
+  localStorage.setItem("playerLng", String(playerPosition.lng));
+  localStorage.setItem("playerPoints", String(playerPoints));
+  localStorage.setItem("cellMap", JSON.stringify([...cellMap.entries()]));
 }
 
-generateCells();
+//load game functionality
+function loadGameState() {
+  const lat = localStorage.getItem("playerLat");
+  const lng = localStorage.getItem("playerLng");
+  const pts = localStorage.getItem("playerPoints");
+  const cm = localStorage.getItem("cellMap");
 
-function generateCells() {
-  cellGroup.clearLayers();
-
-  const mapCenter = pointCoordToIndex(map.getCenter());
-
-  for (let i = -NEIGHBORHOOD_SIZE; i < NEIGHBORHOOD_SIZE; i++) {
-    for (let j = -NEIGHBORHOOD_SIZE; j < NEIGHBORHOOD_SIZE; j++) {
-      const x = mapCenter.x + i;
-      const y = mapCenter.y + j;
-
-      const key = keyFrom(x, y);
-      if (cellMap.has(key)) {
-        const saved = cellMap.get(key);
-        if (saved === null) {
-          continue;
-        } else {
-          spawnCache(x, y);
-        }
-      } else {
-        if (luck([x, y].toString()) < CACHE_SPAWN_PROBABILITY) {
-          spawnCache(x, y);
-        }
-      }
-    }
+  if (lat && lng) {
+    playerPosition.lat = Number(lat);
+    playerPosition.lng = Number(lng);
+  }
+  if (pts) playerPoints = Number(pts);
+  if (cm) {
+    const entries = JSON.parse(cm);
+    cellMap.clear();
+    for (const [k, v] of entries) cellMap.set(k, v);
   }
 }
 
-function distance_to_player(i: number, j: number) {
-  const playerPoint = {
-    x: coordToIndex(playerPosition.lat),
-    y: coordToIndex(playerPosition.lng),
-  };
-  const dx = i - playerPoint.x;
-  const dy = j - playerPoint.y;
-  return Math.sqrt((dx ** 2) + (dy ** 2));
-}
+// load game state
+loadGameState();
 
-function coordToIndex(c: number) {
-  return Math.floor(c / TILE_DEGREES);
-}
-
-function check_game_won(just_made: number) {
-  if (just_made >= 256) {
-    console.log("you won");
-    statusPanelDiv.innerHTML = "you did it!!";
-  }
-}
-
-function pointCoordToIndex(ll: leaflet.LatLng): Point {
-  return { x: coordToIndex(ll.lat), y: coordToIndex(ll.lng) };
-}
-
-function move_player(dir: Point) {
-  playerPosition.lat += indexToCoord(dir.y);
-  playerPosition.lng += indexToCoord(dir.x);
-  playerMarker.remove();
-
-  playerMarker = leaflet.marker(playerPosition);
-  playerMarker.bindTooltip("That's you!");
-  playerMarker.addTo(map);
-
-  generateCells();
+//create cells
+function keyFrom(i: number, j: number) {
+  return `${i},${j}`;
 }
 
 function indexToCoord(i: number) {
   return i * TILE_DEGREES;
 }
 
-//gets the key for the map
-function keyFrom(i: number, j: number): string {
-  return `${i},${j}`;
+function coordToIndex(c: number) {
+  return Math.floor(c / TILE_DEGREES);
 }
+
+function pointCoordToIndex(ll: leaflet.LatLng): Point {
+  return { x: coordToIndex(ll.lat), y: coordToIndex(ll.lng) };
+}
+
+function distance_to_player(i: number, j: number) {
+  const pp = pointCoordToIndex(playerPosition);
+  const dx = i - pp.x;
+  const dy = j - pp.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function check_game_won(v: number) {
+  if (v >= 256) {
+    statusPanelDiv.innerHTML = "You did it!!";
+  }
+}
+
+function spawnCache(i: number, j: number) {
+  const bounds = leaflet.latLngBounds([
+    [i * TILE_DEGREES, j * TILE_DEGREES],
+    [(i + 1) * TILE_DEGREES, (j + 1) * TILE_DEGREES],
+  ]);
+
+  console.log(playerPosition);
+
+  const key = keyFrom(i, j);
+  let rectVal: number | null = cellMap.has(key)
+    ? cellMap.get(key)!
+    : Math.pow(2, Math.floor(luck([i, j, "initial"].toString()) * 4));
+
+  const rect = leaflet.rectangle(bounds).addTo(cellGroup);
+
+  const tooltip = leaflet
+    .tooltip({ permanent: true, direction: "center" })
+    .setContent(rectVal + "");
+  rect.bindTooltip(tooltip);
+
+  rect.on("click", () => {
+    if (distance_to_player(i, j) <= RANGE) {
+      console.log(rectVal);
+      if (rectVal !== null) {
+        console.log(playerPoints);
+        if (playerPoints === 0) {
+          playerPoints += rectVal;
+          statusPanelDiv.innerHTML = `currently holding: ${playerPoints}`;
+          cellMap.set(key, null);
+          tooltip.setContent("empty");
+          rect.remove();
+        } else if (playerPoints === rectVal) {
+          rectVal *= 2;
+          check_game_won(rectVal);
+          playerPoints = 0;
+          cellMap.set(key, rectVal);
+          tooltip.setContent(rectVal.toString());
+        }
+      }
+      saveGameState();
+    } else {
+      statusPanelDiv.innerHTML = "Slug out of reach :(";
+    }
+  });
+}
+
+function generateCells() {
+  cellGroup.clearLayers();
+  const center = pointCoordToIndex(playerPosition);
+
+  console.log(playerPosition);
+
+  for (let di = -NEIGHBORHOOD_SIZE; di < NEIGHBORHOOD_SIZE; di++) {
+    for (let dj = -NEIGHBORHOOD_SIZE; dj < NEIGHBORHOOD_SIZE; dj++) {
+      const i = center.x + di;
+      const j = center.y + dj;
+
+      const key = keyFrom(i, j);
+      if (cellMap.has(key)) {
+        const v = cellMap.get(key);
+        if (v !== null) spawnCache(i, j);
+      } else if (luck([i, j].toString()) < CACHE_SPAWN_PROBABILITY) {
+        spawnCache(i, j);
+      }
+    }
+  }
+}
+
+//player movement
+function move_player_absolute(lat: number, lng: number) {
+  playerPosition.lat = lat;
+  playerPosition.lng = lng;
+
+  playerMarker.remove();
+  playerMarker = leaflet.marker(playerPosition).bindTooltip("Player Location")
+    .addTo(map);
+
+  map.setView(playerPosition, GAMEPLAY_ZOOM_LEVEL);
+
+  generateCells();
+  saveGameState();
+}
+
+//uses GPS
+//had to do a lot of dumb stuff for this to work jesus christ
+class GeoExactMovementController {
+  private watchId: number | null = null;
+
+  start() {
+    if (!navigator.geolocation) {
+      alert("Geolocation not supported");
+      return;
+    }
+
+    // Initialize with current position
+    navigator.geolocation.getCurrentPosition(
+      (pos) => move_player_absolute(pos.coords.latitude, pos.coords.longitude),
+      (err) => console.error(err),
+      { enableHighAccuracy: true },
+    );
+
+    // Watch position continuously
+    this.watchId = navigator.geolocation.watchPosition(
+      (pos) => move_player_absolute(pos.coords.latitude, pos.coords.longitude),
+      (err) => console.error(err),
+      { enableHighAccuracy: true },
+    );
+  }
+
+  stop() {
+    if (this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
+    }
+  }
+}
+
+const controller = new GeoExactMovementController();
+controller.start();
+
+//new game
+const newGameBtn = document.createElement("button");
+newGameBtn.textContent = "NEW GAME";
+newGameBtn.onclick = () => {
+  localStorage.clear();
+  location.reload();
+};
+controlPanelDiv.append(newGameBtn);
 
 const DIRECTION_RIGHT: Point = {
   x: 1,
@@ -254,3 +298,15 @@ inputPanelDiv.appendChild(LEFT);
 inputPanelDiv.appendChild(RIGHT);
 inputPanelDiv.appendChild(UP);
 inputPanelDiv.appendChild(DOWN);
+
+function move_player(dir: Point) {
+  playerPosition.lat += indexToCoord(dir.y);
+  playerPosition.lng += indexToCoord(dir.x);
+  playerMarker.remove();
+
+  playerMarker = leaflet.marker(playerPosition);
+  playerMarker.bindTooltip("That's you!");
+  playerMarker.addTo(map);
+
+  generateCells();
+}
