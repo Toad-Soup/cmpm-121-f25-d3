@@ -11,6 +11,11 @@ import "./_leafletWorkaround.ts";
 // Import luck
 import luck from "./_luck.ts";
 
+const CLASSROOM_LATLNG = leaflet.latLng(
+  36.997936938057016,
+  -122.05703507501151,
+);
+
 // UI elements
 const controlPanelDiv = document.createElement("div");
 controlPanelDiv.id = "controlPanel";
@@ -32,7 +37,7 @@ const CACHE_SPAWN_PROBABILITY = 0.1;
 const RANGE = 5;
 
 const map = leaflet.map(mapDiv, {
-  center: [0, 0], // temporary, will be updated by GPS
+  center: CLASSROOM_LATLNG, // temporary, will be updated by GPS
   zoom: GAMEPLAY_ZOOM_LEVEL,
   minZoom: GAMEPLAY_ZOOM_LEVEL,
   maxZoom: GAMEPLAY_ZOOM_LEVEL,
@@ -62,6 +67,9 @@ interface Point {
 
 const cellMap = new Map<string, number | null>();
 
+map.on("moveend", generateCells);
+
+//**********************************save and load functionality********************************************** */
 //save game functionality
 function saveGameState() {
   localStorage.setItem("playerLat", String(playerPosition.lat));
@@ -92,13 +100,10 @@ function loadGameState() {
 // load game state
 loadGameState();
 
+//*************************************helper functs*************************************** */
 //create cells
 function keyFrom(i: number, j: number) {
   return `${i},${j}`;
-}
-
-function indexToCoord(i: number) {
-  return i * TILE_DEGREES;
 }
 
 function coordToIndex(c: number) {
@@ -122,6 +127,7 @@ function check_game_won(v: number) {
   }
 }
 
+//************************************spawn cells********************************************** */
 function spawnCache(i: number, j: number) {
   const bounds = leaflet.latLngBounds([
     [i * TILE_DEGREES, j * TILE_DEGREES],
@@ -168,6 +174,8 @@ function spawnCache(i: number, j: number) {
   });
 }
 
+generateCells();
+
 function generateCells() {
   cellGroup.clearLayers();
   const center = pointCoordToIndex(playerPosition);
@@ -190,58 +198,7 @@ function generateCells() {
   }
 }
 
-//player movement
-function move_player_absolute(lat: number, lng: number) {
-  playerPosition.lat = lat;
-  playerPosition.lng = lng;
-
-  playerMarker.remove();
-  playerMarker = leaflet.marker(playerPosition).bindTooltip("Player Location")
-    .addTo(map);
-
-  map.setView(playerPosition, GAMEPLAY_ZOOM_LEVEL);
-
-  generateCells();
-  saveGameState();
-}
-
-//uses GPS
-//had to do a lot of dumb stuff for this to work jesus christ
-class GeoExactMovementController {
-  private watchId: number | null = null;
-
-  start() {
-    if (!navigator.geolocation) {
-      alert("Geolocation not supported");
-      return;
-    }
-
-    // Initialize with current position
-    navigator.geolocation.getCurrentPosition(
-      (pos) => move_player_absolute(pos.coords.latitude, pos.coords.longitude),
-      (err) => console.error(err),
-      { enableHighAccuracy: true },
-    );
-
-    // Watch position continuously
-    this.watchId = navigator.geolocation.watchPosition(
-      (pos) => move_player_absolute(pos.coords.latitude, pos.coords.longitude),
-      (err) => console.error(err),
-      { enableHighAccuracy: true },
-    );
-  }
-
-  stop() {
-    if (this.watchId !== null) {
-      navigator.geolocation.clearWatch(this.watchId);
-    }
-  }
-}
-
-const controller = new GeoExactMovementController();
-controller.start();
-
-//new game
+//******************************************new game *******************************************/
 const newGameBtn = document.createElement("button");
 newGameBtn.textContent = "NEW GAME";
 newGameBtn.onclick = () => {
@@ -250,63 +207,104 @@ newGameBtn.onclick = () => {
 };
 controlPanelDiv.append(newGameBtn);
 
-const DIRECTION_RIGHT: Point = {
-  x: 1,
-  y: 0,
-};
-const DIRECTION_LEFT: Point = {
-  x: -1,
-  y: 0,
-};
-const DIRECTION_UP: Point = {
-  x: 0,
-  y: 1,
-};
-const DIRECTION_DOWN: Point = {
-  x: 0,
-  y: -1,
-};
+class PlayerNavigator {
+  position: leaflet.LatLng;
+  geolocationBased: boolean;
+  #watchID: number | null;
+  constructor(geolocationBased: boolean) {
+    this.position = CLASSROOM_LATLNG;
+    this.geolocationBased = geolocationBased;
+    this.#watchID = null;
 
-const LEFT = document.createElement("button");
-LEFT.innerHTML = "MOVE: Left";
-LEFT.addEventListener("click", () => {
-  move_player(DIRECTION_LEFT);
+    // initialize watcher
+    if (this.geolocationBased) {
+      this.#createGeolocationWatcher();
+    }
+  }
+  setGeolocationBased(geolocationBased: boolean) {
+    this.geolocationBased = geolocationBased;
+    if (this.geolocationBased) {
+      // start watching player's geolocation
+      this.#createGeolocationWatcher();
+    } else {
+      // stop watching player's geolocation
+      navigator.geolocation.clearWatch(this.#watchID!);
+    }
+    udpateMovementModeButtonText();
+  }
+  manuallyMovePlayer(delta: leaflet.LatLng) {
+    if (!this.geolocationBased) {
+      this.position.lat += delta.lat;
+      this.position.lng += delta.lng;
+      this.#updatePlayerMarker();
+    }
+  }
+  #createGeolocationWatcher() {
+    this.#watchID = navigator.geolocation.watchPosition(
+      (pos: GeolocationPosition) => {
+        this.position.lat = pos.coords.latitude;
+        this.position.lng = pos.coords.longitude;
+        this.#updatePlayerMarker();
+      },
+      () => {
+        // if it fails, go back to buttons
+        this.setGeolocationBased(false);
+      },
+    );
+  }
+  #updatePlayerMarker() {
+    playerMarker.remove();
+    playerMarker = leaflet.marker(this.position);
+    playerMarker.bindTooltip("That's you!");
+    playerMarker.addTo(map);
+    map.setView(this.position);
+  }
+}
+
+const playerNav = new PlayerNavigator(true);
+
+//make it look pretties ty tate
+function makeDiv(id: string): HTMLDivElement {
+  const div = document.createElement("div");
+  div.id = id;
+  document.body.append(div);
+  return div;
+}
+
+// Movement Buttons
+const buttonPanelDiv = makeDiv("buttonPanel");
+
+function makeButtonMove(text: string, delta: leaflet.LatLng) {
+  const buttonDebugMove = document.createElement("button");
+  buttonDebugMove.innerHTML = text;
+  buttonDebugMove.addEventListener("click", () => {
+    playerNav.manuallyMovePlayer(delta);
+  });
+  buttonPanelDiv.appendChild(buttonDebugMove);
+  return buttonDebugMove;
+}
+
+makeButtonMove("LEFT", leaflet.latLng(0, -TILE_DEGREES));
+makeButtonMove("RIGHT", leaflet.latLng(0, TILE_DEGREES));
+makeButtonMove("UP", leaflet.latLng(TILE_DEGREES, 0));
+makeButtonMove("DOWN", leaflet.latLng(-TILE_DEGREES, 0));
+
+// Settings for switching between geolocation and buttons, and new game
+document.body.appendChild(document.createElement("br"));
+const settingsDiv = makeDiv("settingsPanel");
+const movementModeButton = document.createElement("button");
+movementModeButton.id = "movementMode";
+movementModeButton.addEventListener("click", () => {
+  playerNav.setGeolocationBased(!playerNav.geolocationBased);
+  udpateMovementModeButtonText();
 });
+udpateMovementModeButtonText();
+settingsDiv.appendChild(movementModeButton);
 
-const RIGHT = document.createElement("button");
-RIGHT.innerHTML = "MOVE: Right";
-RIGHT.addEventListener("click", () => {
-  move_player(DIRECTION_RIGHT);
-});
-
-const UP = document.createElement("button");
-UP.innerHTML = "MOVE: Up";
-UP.addEventListener("click", () => {
-  move_player(DIRECTION_UP);
-});
-
-const DOWN = document.createElement("button");
-DOWN.innerHTML = "MOVE: Down";
-DOWN.addEventListener("click", () => {
-  move_player(DIRECTION_DOWN);
-});
-const inputPanelDiv = document.createElement("div");
-inputPanelDiv.id = "inputPanel";
-document.body.append(inputPanelDiv);
-
-inputPanelDiv.appendChild(LEFT);
-inputPanelDiv.appendChild(RIGHT);
-inputPanelDiv.appendChild(UP);
-inputPanelDiv.appendChild(DOWN);
-
-function move_player(dir: Point) {
-  playerPosition.lat += indexToCoord(dir.y);
-  playerPosition.lng += indexToCoord(dir.x);
-  playerMarker.remove();
-
-  playerMarker = leaflet.marker(playerPosition);
-  playerMarker.bindTooltip("That's you!");
-  playerMarker.addTo(map);
-
-  generateCells();
+function udpateMovementModeButtonText() {
+  if (playerNav.geolocationBased) {
+    movementModeButton.innerHTML = "Switch to Button Movement";
+  } else {
+    movementModeButton.innerHTML = "Switch to Geolocation Movement";
+  }
 }
