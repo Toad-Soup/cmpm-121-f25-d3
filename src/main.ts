@@ -97,11 +97,9 @@ function loadGameState() {
   }
 }
 
-// load game state
 loadGameState();
 
 //*************************************helper functs*************************************** */
-//create cells
 function keyFrom(i: number, j: number) {
   return `${i},${j}`;
 }
@@ -289,7 +287,6 @@ makeButtonMove("RIGHT", leaflet.latLng(0, TILE_DEGREES));
 makeButtonMove("UP", leaflet.latLng(TILE_DEGREES, 0));
 makeButtonMove("DOWN", leaflet.latLng(-TILE_DEGREES, 0));
 
-// Settings for switching between geolocation and buttons, and new game
 document.body.appendChild(document.createElement("br"));
 const settingsDiv = makeDiv("settingsPanel");
 const movementModeButton = document.createElement("button");
